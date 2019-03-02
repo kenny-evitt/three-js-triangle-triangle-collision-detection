@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset=utf-8>
+  <title>three.js triangle-triangle collision detection</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="info">
+    <h2>Info</h2>
+    <p>Check the browser console for a test case you can add to this page's code for the current triangles.</p>
+    <p>Do triangles intersect? <span id="intersects-span" style="padding-left: 1em;"></span></p>
+    <p>
+      <button autocomplete="off" id="randomize-triangles-button" type="button">Randomize triangles</button>
+    </p>
+    <p>
+      <button autocomplete="off" id="run-tests-button" type="button">Run tests</button>
+      <span id="run-tests-status" style="padding-left: 1em;"></span>
+    </p>
+    <div id="failed-test-cases-block">
+      <template id="failed-test-case-template">
+        <pre style="background-color: #fff3"><code></code></pre>
+      </template>
+    </div>
+  </div>
+  <script src="three-r102.js"></script>
+  <script src="orbit-controls.js"></script>
+  <script src="collision-tests.js"></script>
+  <script>
+
+
+
+var triangleMesh_0,
+    triangleMesh_1;
+
+const intersectsSpan = document.getElementById("intersects-span");
+
+
+
+function testTriangleMeshIntersection() {
+  intersectsSpan.textContent = doTriangleMeshesIntersect(triangleMesh_0, triangleMesh_1) ? "Yes" : "No";
+}
+
+
+
+/** Run after the page loads */
+
+addEventListener('load', function (_event) {
+
+  var renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+
+  var scene = new THREE.Scene();
+
+
+  triangleMesh_0 = createTriangleMesh(
+    0x2ca25f,                       // Color
+    new THREE.Vector3(-5,  5, 0),   // Vertex0
+    new THREE.Vector3(-5, -5, 0),   // Vertex1
+    new THREE.Vector3( 5, -5, 0)    // Vertex2
+  );
+
+  triangleMesh_1 = createTriangleMesh(
+    0x99d8c9,                       // Color
+    new THREE.Vector3(-4, -4, -1),  // Vertex0
+    new THREE.Vector3( 0,  0, -1),  // Vertex1
+    new THREE.Vector3( 0,  0,  4)   // Vertex2
+  );
+
+  scene.add(triangleMesh_0);
+  scene.add(triangleMesh_1);
+
+
+  var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 500);
+  camera.position.set(0, 0, 20);
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+  var controls = new THREE.OrbitControls(camera);
+
+  testTriangleMeshIntersection();
+
+  animate(renderer, scene, camera);
+});
+
+
+
+/**
+ * Run tests
+ */
+
+const runTestsStatusButton   = document.getElementById("run-tests-button"),
+      runTestsStatusSpan     = document.getElementById("run-tests-status"),
+      failedTestCaseBlock    = document.getElementById("failed-test-cases-block");
+      failedTestCaseTemplate = document.getElementById("failed-test-case-template");
+
+runTestsStatusButton.addEventListener('click', function (_event) {
+  runTestsStatusButton.disabled = true;
+
+  const failedTestCases = runTests();
+
+  if (failedTestCases.length === 0)
+    runTestsStatusSpan.textContent = `All ${testCases.length} test cases passed.`;
+  else if (failedTestCases.length === testCases.length)
+    runTestsStatusSpan.textContent = `All ${testCases.length} test cases failed.`;
+  else
+    runTestsStatusSpan.textContent = `${failedTestCases.length} out of ${testCases.length} test cases failed.`;
+
+  failedTestCases.forEach(function (case_) {
+    var failedTestCaseElement = document.importNode(failedTestCaseTemplate.content, true);
+    var codeElement = failedTestCaseElement.querySelector("code");
+    codeElement.innerHTML = generateTestCaseJavaScript(case_);
+    failedTestCaseBlock.appendChild(failedTestCaseElement);
+  });
+});
+
+
+
+/** Generate random vertex component between -5 and 5 */
+
+function generateRandomVertexComponent() {
+  return Math.random() * 10 - 5;
+}
+
+
+
+/** Randomize triangles */
+
+document.getElementById("randomize-triangles-button")
+.addEventListener('click', function (_event) {
+  triangleMesh_0.geometry.vertices.forEach(function (vertex) {
+    vertex.x = generateRandomVertexComponent();
+    vertex.y = generateRandomVertexComponent();
+    vertex.z = generateRandomVertexComponent();
+  });
+
+  triangleMesh_0.geometry.verticesNeedUpdate = true;
+
+
+  triangleMesh_1.geometry.vertices.forEach(function (vertex) {
+    vertex.x = generateRandomVertexComponent();
+    vertex.y = generateRandomVertexComponent();
+    vertex.z = generateRandomVertexComponent();
+  });
+
+  triangleMesh_1.geometry.verticesNeedUpdate = true;
+
+
+  testTriangleMeshIntersection();
+});
+
+
+
+/** Create a triangle mesh */
+
+function createTriangleMesh(color, vertex0, vertex1, vertex2) {
+
+  var material = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide });
+
+  var geometry = new THREE.Geometry();
+
+  geometry.vertices.push(vertex0);
+  geometry.vertices.push(vertex1);
+  geometry.vertices.push(vertex2);
+
+  geometry.faces.push(new THREE.Face3(0, 1, 2));
+
+  return new THREE.Mesh(geometry, material);
+}
+
+
+
+/** Animate */
+
+function animate(renderer, scene, camera) {
+
+  requestAnimationFrame(function () {
+    animate(renderer, scene, camera);
+  });
+
+  renderer.render(scene, camera);
+}
+
+
+
+/**
+ * Get (a new) Triangle, in world coordinates, for the indexed Face in a Geometry
+ */
+
+function getGeometryFaceWorldTriangle(geometry, faceIndex, worldMatrix) {
+
+  var face = geometry.faces[faceIndex];
+
+  return new THREE.Triangle(
+    geometry.vertices[face.a].applyMatrix4(worldMatrix),
+    geometry.vertices[face.b].applyMatrix4(worldMatrix),
+    geometry.vertices[face.c].applyMatrix4(worldMatrix)
+  );
+}
+
+
+
+/**
+ * Return whether two triangle Mesh-es intersect
+ */
+
+function doTriangleMeshesIntersect(tm0, tm1) {
+
+  var t0 = getGeometryFaceWorldTriangle(tm0.geometry, 0, tm0.matrixWorld);
+  var t1 = getGeometryFaceWorldTriangle(tm1.geometry, 0, tm1.matrixWorld);
+
+  const doesIntersect = doTrianglesIntersect(t0, t1);
+
+  const testCase = [ t0.a, t0.b, t0.c,  t1.a, t1.b, t1.c,  doesIntersect ];
+  console.log("Test case data:");
+  console.log(generateTestCaseJavaScript(testCase));
+
+  return doesIntersect;
+}
+
+
+
+/** Test that two triangles intersect, or not, as expected */
+
+function test(t0_v0, t0_v1, t0_v2,  t1_v0, t1_v1, t1_v2,  intersectsExpected) {
+  var t0 = new THREE.Triangle(t0_v0, t0_v1, t0_v2),
+      t1 = new THREE.Triangle(t1_v0, t1_v1, t1_v2);
+
+  return intersectsExpected === doTrianglesIntersect(t0, t1);
+}
+
+const testCases = [
+  [
+    new THREE.Vector3(-5,  5,  0),
+    new THREE.Vector3(-5, -5,  0),
+    new THREE.Vector3( 5, -5,  0),
+
+    new THREE.Vector3(-4, -4, -1),
+    new THREE.Vector3( 0,  0, -1),
+    new THREE.Vector3( 0,  0,  4),
+
+    true
+  ],
+
+  [
+    new THREE.Vector3(  3.864994683561619,   1.2509252852376846, -3.6066277261844815 ),
+    new THREE.Vector3(  1.1975897709872267,  4.586221316913052,   3.6670550244269933 ),
+    new THREE.Vector3(  4.267812696229356,  -0.7021303537570001, -2.1079316301943796 ),
+
+    new THREE.Vector3( -3.6345636519509705,  3.1124790353390086, -1.5461949016779863 ),
+    new THREE.Vector3(  4.238340236606968,   4.259454430432568,  -2.509734340518097  ),
+    new THREE.Vector3( -3.3604777082954973,  3.2556602609236798, -0.7180647959668685 ),
+
+    false
+  ],
+
+  [
+    new THREE.Vector3( -1.3128973224686935,  3.5447127734128827, -0.7569481047827225  ),
+    new THREE.Vector3(  1.9429648277005622,  3.5253203246575566,  1.541561842679073   ),
+    new THREE.Vector3( -1.3038717031394254, -1.1334543159408361,  4.883277124721193   ),
+
+    new THREE.Vector3( -4.652730714964097,   1.0383217756329444,  3.453144179978585   ),
+    new THREE.Vector3( -0.6914959254539106,  3.434352137877923,   3.375107570321818   ),
+    new THREE.Vector3(  4.889264091143776,  -2.8931032184747707,  0.19042646559876086 ),
+
+    true
+  ],
+
+  // Dummy failing test:
+
+  /*
+  [
+    new THREE.Vector3(-5,  5,  0),
+    new THREE.Vector3(-5, -5,  0),
+    new THREE.Vector3( 5, -5,  0),
+
+    new THREE.Vector3(-4, -4, -1),
+    new THREE.Vector3( 0,  0, -1),
+    new THREE.Vector3( 0,  0,  4),
+
+    false
+  ]
+  */
+];
+
+
+
+function runTests() {
+  var failedCases = [];
+
+  // `case` is a reserved keyword in JavaScript:
+
+  testCases.forEach(function (case_) {
+    if (! test(case_[0], case_[1], case_[2],  case_[3], case_[4], case_[5],  case_[6]))
+      failedCases.push(case_);
+  });
+
+  return failedCases;
+}
+
+
+
+function generateTestCaseJavaScript(case_) {
+  const t0_v0 = case_[0], t0_v1 = case_[1], t0_v2 = case_[2],
+        t1_v0 = case_[3], t1_v1 = case_[4], t1_v2 = case_[5],
+        intersectsExpected = case_[6];
+
+  return `  [
+    new THREE.Vector3(${t0_v0.x.toString()},  ${t0_v0.y.toString()},  ${t0_v0.z.toString()}),
+    new THREE.Vector3(${t0_v1.x.toString()},  ${t0_v1.y.toString()},  ${t0_v1.z.toString()}),
+    new THREE.Vector3(${t0_v2.x.toString()},  ${t0_v2.y.toString()},  ${t0_v2.z.toString()}),
+
+    new THREE.Vector3(${t1_v0.x.toString()},  ${t1_v0.y.toString()},  ${t1_v0.z.toString()}),
+    new THREE.Vector3(${t1_v1.x.toString()},  ${t1_v1.y.toString()},  ${t1_v1.z.toString()}),
+    new THREE.Vector3(${t1_v2.x.toString()},  ${t1_v2.y.toString()},  ${t1_v2.z.toString()}),
+
+    ${intersectsExpected}
+  ]`;
+}
+
+
+
+  </script>
+</body>
+</html>
